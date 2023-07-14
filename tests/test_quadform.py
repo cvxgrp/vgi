@@ -57,8 +57,6 @@ def test_standardization_consistency_grad():
     orig = V.grad(x)
     V.apply_standardization(X_mean, X_std, V_mean, V_std)
     V.reverse_standardization(X_mean, X_std, V_mean, V_std)
-    print(orig)
-    print(V.grad(x))
     assert np.allclose(orig, V.grad(x))
 
 

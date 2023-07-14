@@ -10,7 +10,6 @@ def test_quadreg():
     y = V(x)
 
     fitter = QuadReg(l2_penalty=1e-3, l1_penalty=1e-4).fit(x, y)
-    print(np.linalg.norm(fitter.V_.params - V.params))
     assert np.allclose(fitter.V_.params, V.params, atol=1e-4)
 
 
@@ -21,6 +20,5 @@ def test_quadgradreg():
     x = np.random.randn(500, 5)
     y = V.grad(x)
 
-    fitter = QuadGradReg(l2_penalty=1e-3, l1_penalty=1e-4).fit(x, y)
-    print(np.linalg.norm(fitter.V_.params - V.params))
+    fitter = QuadGradReg(l2_penalty=1e-4, l1_penalty=1e-4).fit(x, y)
     assert np.allclose(fitter.V_.params, V.params, atol=1e-4)
