@@ -1,7 +1,7 @@
-# Value-gradient iteration (VGI) - A method for convex stochastic control
+# VGI - A method for convex stochastic control
 [![Main Test](https://github.com/cvxgrp/vgi/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/cvxgrp/vgi/actions/workflows/test.yml)
 
-VGI is a method for designing policies for convex stochastic control problems
+Value-gradient iteration (VGI) is a method for designing policies for convex stochastic control problems
 characterized by random linear dynamics and convex stage cost. We consider policies
 that employ quadratic approximate value functions as a substitute for the true value
 function. Evaluating the associated control policy involves solving a convex problem,
