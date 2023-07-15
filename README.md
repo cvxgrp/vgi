@@ -27,7 +27,7 @@ $$J = \lim_{T\to\infty}\frac 1 T \sum_{t=0}^{T-1} g(x_t, u_t),$$
 where $g$ is a convex stage cost. The stage cost can take on infinite values, to represent constraints on $(x_t, u_t)$.
 
 We consider approximate dynamic programming (ADP) control policies of the form
-$$\phi(x_t) = \argmin_u \left(g(x_t, u) + \mathbf{E} \hat V(A_t x_t + B_t u + c_t)\right),$$
+$$\phi(x_t) = \text{argmin}_u \left(g(x_t, u) + \mathbf{E} \hat V(A_t x_t + B_t u + c_t)\right),$$
 where $\hat V$ is a quadratic approximate value function of the form $\hat V(x) = (1/2)x^TPx + p^Tx$. If $\hat V$ is an optimal value function, then the ADP policy is also optimal.
 
 ## Example
