@@ -2,7 +2,5 @@ numpy >=1.17.5
 scipy
 cvxpy
 cvxpygen
-torch
-cvxpylayers
 scikit-learn
 pathos

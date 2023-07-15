@@ -15,8 +15,7 @@ For more details, see our [manuscript](https://stanford.edu/~boyd/papers/pdf/vgi
 
 To install locally, clone the repository, and run
 ```pip install -e .```
-in the repo directory. Optionally, create a pyenv or conda environment first.
-
+in the repo directory. Optionally, create a pyenv or conda environment first. Note that the examples require additional dependencies,[```torch```](https://pytorch.org/) and [```cvxpylayers```](https://github.com/cvxgrp/cvxpylayers).
 
 ## Convex stochastic control
 We consider convex stochastic control problems, which have dynamics

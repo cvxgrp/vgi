@@ -28,8 +28,6 @@ setup(
         "scipy",
         "cvxpy",
         "cvxpygen",
-        "torch",
-        "cvxpylayers",
         "scikit-learn",
         "pathos",
     ],
