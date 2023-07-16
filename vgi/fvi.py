@@ -89,9 +89,9 @@ class FVI:
             if verbose:
                 if i == 1:
                     # print header
-                    header = "    It.\td(TV, V) \tdamping\t\regression score"
+                    header = "It.\td(TV, V) \tdamping\t\tfit score"
                     if verbose and len(self.costs) > 0:
-                        header += "\t\tcost"
+                        header += "\tcost"
                     print(header)
 
                 message = "%d\t%0.2e\t%0.2e\t%0.2e" % (
