@@ -421,7 +421,8 @@ def supply_chain_cocp_grad(
     Vlb=None,
     policy=None,
     eval_freq=None,
-    lambda_l2=0.0,
+    l2_penalty=0.0,
+    restart_simulations=True,
 ):
     if seed is None:
         seed = int.from_bytes(os.urandom(4), byteorder="little")
@@ -433,7 +434,7 @@ def supply_chain_cocp_grad(
     B, r, tau, alpha, beta = map(
         torch.from_numpy,
         [
-            problem.A_in_out.toarray(),
+            problem.B.toarray(),
             problem.r,
             problem.tau,
             problem.alpha,
@@ -523,8 +524,8 @@ def supply_chain_cocp_grad(
 
             x_batch = (x_batch + torch.bmm(B_batch, u_batch)).double()
 
-        if lambda_l2 > 0.0:
-            loss += lambda_l2 * (torch.sum(P_sqrt**2) + 2 * torch.sum(q**2))
+        if l2_penalty > 0.0:
+            loss += l2_penalty * (torch.sum(P_sqrt**2) + 2 * torch.sum(q**2))
 
         return loss, x_batch.detach()
 
@@ -568,10 +569,16 @@ def supply_chain_cocp_grad(
                     "it: %03d, test loss: %3.3f, policy cost: %3.3f"
                     % (k + 1, test_loss, expected_cost)
                 )
+            else:
+                print("it: %03d" % (k+1))
 
         opt.zero_grad()
         l, x0 = lossf(
-            samples_per_iter, num_trajectories, P_sqrt, p, x_batch=None, seed=k + 1
+            samples_per_iter,
+            num_trajectories,
+            P_sqrt, p,
+            x_batch=None if restart_simulations else x0,
+            seed=k + 1,
         )
         l.backward()
         opt.step()
@@ -588,7 +595,7 @@ def supply_chain_cocp_grad(
             _pi = cp.Variable((1, 1))
             block = cp.bmat([[_P, _p], [_p.T, _pi]])
             block_lb = np.block(
-                [[Vlb.P, Vlb.p.reshape(-1, 1)], [Vlb.p.reshape(1, -1), Vlb.pi]]
+                [[Vlb.P, Vlb.p.reshape(-1, 1)], [Vlb.p.reshape(1, -1), Vlb.c]]
             )
             proj = cp.Problem(
                 cp.Minimize(

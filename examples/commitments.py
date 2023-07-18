@@ -315,7 +315,7 @@ def commitment_cvxpylayer(problem):
 
     stage_cost = cp.sum_squares(xu[:m, 0] - target_nav)
     if u_reg > 0:
-        stage_cost += cp.sum_squares(u[:, 0] - u_ss)
+        stage_cost += u_reg * cp.sum_squares(u[:, 0] - u_ss)
     value_next = cp.sum_squares(H_sqrt @ xu) + 2 * h.T @ xu
     constraints = [xu == cp.vstack((x, u)), u >= 0, u <= budget]
     prob = cp.Problem(cp.Minimize(stage_cost + gamma * value_next), constraints)
@@ -364,7 +364,8 @@ def commitment_cocp_grad(
     Vlb=None,
     policy=None,
     eval_freq=None,
-    lambda_l2=0.0,
+    l2_penalty=0.0,
+    restart_simulations=False,
 ):
     if seed is None:
         seed = int.from_bytes(os.urandom(4), byteorder="little")
@@ -424,8 +425,8 @@ def commitment_cocp_grad(
                 torch.bmm(A_batch, x_batch) + torch.bmm(B_batch, u_batch)
             ).double()
 
-        if lambda_l2 > 0.0:
-            loss += lambda_l2 * (torch.sum(P_sqrt**2) + 2 * torch.sum(q**2))
+        if l2_penalty > 0.0:
+            loss += l2_penalty * (torch.sum(P_sqrt**2) + 2 * torch.sum(q**2))
 
         return loss, x_batch.detach()
 
@@ -470,6 +471,8 @@ def commitment_cocp_grad(
                     "it: %03d, test loss: %3.3f, policy cost: %3.3f"
                     % (k + 1, test_loss, expected_cost)
                 )
+            else:
+                print("it: %03d" % (k+1))
 
         # gradient step
         opt.zero_grad()
@@ -478,7 +481,7 @@ def commitment_cocp_grad(
             num_trajectories,
             P_sqrt,
             p,
-            x_batch=None,
+            x_batch=None if restart_simulations else x0,
             seed=seed + k + 1,
         )
         l.backward()
@@ -496,7 +499,7 @@ def commitment_cocp_grad(
             _pi = cp.Variable((1, 1))
             block = cp.bmat([[_P, _p], [_p.T, _pi]])
             block_lb = np.block(
-                [[Vlb.P, Vlb.p.reshape(-1, 1)], [Vlb.p.reshape(1, -1), Vlb.pi]]
+                [[Vlb.P, Vlb.p.reshape(-1, 1)], [Vlb.p.reshape(1, -1), Vlb.c]]
             )
             proj = cp.Problem(
                 cp.Minimize(

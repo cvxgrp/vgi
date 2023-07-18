@@ -171,17 +171,14 @@ def box_lqr_cvxpylayer(problem):
 
     x = cp.Parameter((n, 1))
     P_sqrt = cp.Parameter((n, n))
-    q = cp.Parameter(n)
 
     u = cp.Variable((m, 1))
     xnext = cp.Variable((n, 1))
 
-    objective = cp.quad_form(u, R) + gamma * (
-        cp.sum_squares(P_sqrt @ xnext) + q @ xnext
-    )
+    objective = cp.quad_form(u, R) + gamma * cp.sum_squares(P_sqrt @ xnext)
     constraints = [xnext == A @ x + B @ u, cp.norm(u, "inf") <= u_max]
     prob = cp.Problem(cp.Minimize(objective), constraints)
-    policy = CvxpyLayer(prob, [x, P_sqrt, q], [u])
+    policy = CvxpyLayer(prob, [x, P_sqrt], [u])
 
     return policy
 
@@ -196,8 +193,9 @@ def box_lqr_cocp_grad(
     V0=None,
     Vlb=None,
     policy=None,
-    lambda_l2=0.0,
+    l2_penalty=0.0,
     eval_freq=None,
+    restart_simulations=False,
 ):
     """Differentiate through COCP"""
     if seed is None:
@@ -212,21 +210,20 @@ def box_lqr_cocp_grad(
     torch_policy = box_lqr_cvxpylayer(problem)
 
     # define loss
-    def lossf(time_horizon, batch_size, P_sqrt, q, x_batch=None, seed=None):
+    def lossf(time_horizon, batch_size, P_sqrt, x_batch=None, seed=None):
         if seed is not None:
             torch.manual_seed(seed)
             np.random.seed(seed)
         if x_batch is None:
             x_batch = np.sqrt(problem.c_var) * torch.randn(batch_size, n, 1).double()
         P_sqrt_batch = P_sqrt.repeat(batch_size, 1, 1)
-        q_batch = q.repeat(batch_size, 1)
         Qt_batch = Qt.repeat(batch_size, 1, 1)
         Rt_batch = Rt.repeat(batch_size, 1, 1)
         At_batch = At.repeat(batch_size, 1, 1)
         Bt_batch = Bt.repeat(batch_size, 1, 1)
         loss = 0.0
         for _ in range(time_horizon):
-            (u_batch,) = torch_policy(x_batch, P_sqrt_batch, q_batch)
+            (u_batch,) = torch_policy(x_batch, P_sqrt_batch)
             state_cost = torch.bmm(
                 torch.bmm(Qt_batch, x_batch).transpose(2, 1), x_batch
             )
@@ -242,8 +239,8 @@ def box_lqr_cocp_grad(
                 torch.bmm(At_batch, x_batch) + torch.bmm(Bt_batch, u_batch) + c_batch
             )
 
-        if lambda_l2 > 0.0:
-            loss += lambda_l2 * (torch.sum(P_sqrt**2) + 2 * torch.sum(q**2))
+        if l2_penalty > 0.0:
+            loss += l2_penalty * (torch.sum(P_sqrt**2))
 
         return loss, x_batch.detach()
 
@@ -253,20 +250,17 @@ def box_lqr_cocp_grad(
         P_sqrt = torch.from_numpy(np.eye(problem.n))
     else:
         P_sqrt = torch.from_numpy(V0.U)
-
-    p = torch.zeros(n).double()
     P_sqrt.requires_grad_(True)
-    p.requires_grad_(True)
 
     # run optimization
-    opt = torch.optim.Adam([P_sqrt, p], lr=learning_rate)
+    opt = torch.optim.Adam([P_sqrt,], lr=learning_rate)
     costs = []
     value_iterates = []
-    x_batch = None
+    x0 = None
     for k in range(num_iters):
         with torch.no_grad():
             U = P_sqrt.detach().numpy()
-            V = QuadForm(U, p.detach().numpy(), 0.0)
+            V = QuadForm(U, np.zeros(n), 0.0)
             value_iterates.append(V)
 
             if (k % eval_freq == 0 or k == num_iters - 1) and policy is not None:
@@ -278,7 +272,6 @@ def box_lqr_cocp_grad(
                     samples_per_iter,
                     num_trajectories,
                     P_sqrt.detach(),
-                    p.detach(),
                     seed=0,
                 )[0].item()
 
@@ -287,6 +280,8 @@ def box_lqr_cocp_grad(
                     "it: %03d, test loss: %3.3f, policy cost: %3.3f"
                     % (k + 1, test_loss, expected_cost)
                 )
+            else:
+                print("it: %03d" % (k+1))
 
         # gradient step
         opt.zero_grad()
@@ -294,8 +289,7 @@ def box_lqr_cocp_grad(
             samples_per_iter,
             num_trajectories,
             P_sqrt,
-            p,
-            x_batch=None,
+            x_batch=None if restart_simulations else x0,
             seed=seed + k + 1,
         )
         l.backward()
@@ -304,28 +298,15 @@ def box_lqr_cocp_grad(
         # enforce lower bound
         if Vlb is not None:
             P_sqrt_npy = P_sqrt.detach().numpy()
-
             P_curr = P_sqrt_npy.T @ P_sqrt_npy
-            p_curr = p.detach().numpy()
-
             _P = cp.Variable((problem.n, problem.n), PSD=True)
-            _p = cp.Variable((problem.n, 1))
-            _pi = cp.Variable((1, 1))
-            block = cp.bmat([[_P, _p], [_p.T, _pi]])
-            block_lb = np.block(
-                [[Vlb.P, Vlb.p.reshape(-1, 1)], [Vlb.p.reshape(1, -1), Vlb.pi]]
-            )
             proj = cp.Problem(
-                cp.Minimize(
-                    cp.sum_squares(_P - P_curr) + 2 * cp.sum_squares(_p[:, 0] - p_curr)
-                ),
-                [block - block_lb >> 0],
+                cp.Minimize(cp.sum_squares(_P - P_curr)),
+                [_P >> P_curr],
             )
             proj.solve()
 
             P_sqrt.data.fill_(0)
             P_sqrt.data += torch.from_numpy(psd_sqrt(_P.value))
-            p.data.fill_(0)
-            p.data += torch.from_numpy(_p.value).squeeze()
 
     return {"costs": costs, "iterates": value_iterates}
