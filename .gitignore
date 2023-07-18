@@ -165,4 +165,8 @@ cython_debug/
 # generated c code files
 VGI_code*
 
+# generated figures
 *.pdf
+
+# generated data files
+*.pkl

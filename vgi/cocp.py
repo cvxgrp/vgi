@@ -43,7 +43,9 @@ class COCP(Policy):
         **params
     ):
         # any extra arguments provided
-        self.params = params
+        self._params = params
+        for key in params:
+            setattr(self, key, params[key])
 
         # problem dimensions
         self.n = n
@@ -144,7 +146,7 @@ class COCP(Policy):
             solver_settings=self.solver_settings,
             name=self.name if self.compiled else "",
             stage_cost_params=self.stage_cost_params[1],
-            **self.params,
+            **self._params,
         )
 
     def register_solution_method(self, policy_name):

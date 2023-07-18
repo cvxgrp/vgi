@@ -314,47 +314,31 @@ class SupplyChainProblem(ControlProblem):
 class SupplyChainPolicy(COCP):
     def __call__(self, x, t):
         """Evaluate the policy at augmented state x"""
-        num_buyers = self.params["num_buyers"]
-
-        # unpack state
         h = x[: self.n]
-        p = x[self.n : self.n + num_buyers]
-        d = x[self.n + num_buyers :]
+        p = x[self.n : self.n + self.num_buyers]
+        d = x[self.n + self.num_buyers :]
 
         return super().__call__(h, t, **{"p": p, "d": d})
 
     def stage_cost(self, x, u, p=None, d=None):
-        alpha = self.params["alpha"]
-        beta = self.params["beta"]
-        r = self.params["r"]
-        tau = self.params["tau"]
-
-        A_in = self.params["A_in"]
-        A_out = self.params["A_out"]
-        u_max = self.params["u_max"]
-        h_max = self.params["h_max"]
-
-        num_buyers = self.params["num_buyers"]
-        num_sellers = self.params["num_sellers"]
-
         # unpack state
         h = x[: self.n]
         # unpack input
-        b = u[:num_buyers]
-        s = u[num_buyers : num_buyers + num_sellers]
-        z = u[num_buyers + num_sellers :]
+        b = u[:self.num_buyers]
+        s = u[self.num_buyers : self.num_buyers + self.num_sellers]
+        z = u[self.num_buyers + self.num_sellers :]
 
         # stage cost
-        stage_cost = -r @ s + tau @ z
-        stage_cost += alpha @ h + beta @ cp.square(h)
+        stage_cost = -self.r @ s + self.tau @ z
+        stage_cost += self.alpha @ h + self.beta @ cp.square(h)
         stage_cost += p @ b
 
         constraints = [
-            A_out @ u <= h,
+            self.A_out @ u <= h,
             u >= 0,
-            u <= u_max,
-            h + (A_in - A_out) @ u >= 0,
-            h + (A_in - A_out) @ u <= h_max,
+            u <= self.u_max,
+            h + (self.A_in - self.A_out) @ u >= 0,
+            h + (self.A_in - self.A_out) @ u <= self.h_max,
             s <= d,
         ]
 

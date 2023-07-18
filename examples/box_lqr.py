@@ -50,7 +50,6 @@ class BoxLQRProblem(ControlProblem):
         return x_next, c, stage_cost
 
     def sample_initial_condition(self):
-        """Draw a sample from model's named variable 'x0'"""
         return np.sqrt(self.x0_var) * np.random.randn(self.n)
 
     def sample_random_control(self, x, t):
@@ -88,10 +87,15 @@ class BoxLQRProblem(ControlProblem):
         W = self.c_var * np.eye(self.n)
         P = cp.Variable((self.n, self.n), PSD=True)
         R = cp.Variable((self.m, self.m), PSD=True)
-        lam = cp.Variable(self.m, nonneg=True)
 
-        objective = cp.trace(P @ W) - (self.u_max**2) * cp.sum(lam)
-        constraints = [R - self.R << cp.diag(lam), P >> 0, R >> 0, lam >= 0]
+        if np.isfinite(self.u_max):
+            lam = cp.Variable(self.m, nonneg=True)
+            objective = cp.trace(P @ W) - (self.u_max**2) * cp.sum(lam)
+            constraints = [R - self.R << cp.diag(lam), P >> 0, R >> 0, lam >= 0]
+        else:
+            objective = cp.trace(P @ W)
+            constraints = [P >> 0, R >> 0]
+
         constraints += [
             cp.bmat(
                 [
@@ -151,16 +155,11 @@ class BoxLQRPolicy(COCP):
     """Quadratic COCP for LQR problem,"""
 
     def stage_cost(self, x, u):
-        if "u_max" in self.params.keys() and np.isfinite(self.params["u_max"]):
-            constraints = [u >= -self.params["u_max"], u <= self.params["u_max"]]
+        if np.isfinite(self.u_max):
+            constraints = [u >= -self.u_max, u <= self.u_max]
         else:
             constraints = []
-        return (
-            cp.sum_squares(psd_sqrt(self.params["Q"]) @ x)
-            + cp.sum_squares(psd_sqrt(self.params["R"]) @ u),
-            constraints,
-        )
-
+        return cp.sum_squares(psd_sqrt(self.Q) @ x) + cp.sum_squares(psd_sqrt(self.R) @ u), constraints,
 
 def box_lqr_cvxpylayer(problem):
     n, m = problem.n, problem.m

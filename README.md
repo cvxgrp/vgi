@@ -47,7 +47,7 @@ problem = BoxLQRProblem.create_problem_instance(n, m, seed=0, processes=5)
 Adding the extra argument ```processes=5``` lets us run simulations in parallel using 5 processes. By default, the cost is evaluated by simulating ```eval_trajectories=5``` trajectories, each for ```eval_horizon=2*10**4``` steps. 
 
 We can get a quadratic lower bound on the optimal value function with
-```
+```python
 V_lb = problem.V_lb()
 ```
 
@@ -59,7 +59,7 @@ mpc = problem.create_policy(lookahead=30, compile=True, name="box_lqr_policy")
 Setting the argument ```compile=True``` generates a custom solver implementation in C using [CVXPYgen](https://github.com/cvxgrp/cvxpygen).
 
 To find an ADP policy using VGI, we run
-```
+```python
 # initialize VGI method
 vgi_method = vgi.VGI(
     problem,
@@ -69,13 +69,12 @@ vgi_method = vgi.VGI(
     num_trajectories=1,
     damping=0.5,
 )
-
 # find ADP policy by running VGI for 20 iterations
 adp_policy = vgi_method(20)
 ```
 
 To simulate the policy for 100 steps and plot the state trajectories, we can run
-```
+```python
 simulation = problem.simulate(adp_policy, 100)
 
 import matplotlib.pyplot as plt
@@ -84,6 +83,97 @@ plt.show()
 ```
 
 To evaluate the average cost of the policy via simulation, we can run
-```
+```python
 adp_cost = problem.cost(adp_policy)
 ```
+
+## Defining your own control problems
+
+Examples of control problems can be found in [The examples folder](examples/). To set up a new control problem, we can inherit the ```ControlProblem``` class. For example, to create a linear quadratic regulator (LQR) problem, we might write
+```python
+from vgi import ControlProblem
+class LQRProblem(ControlProblem):
+
+    def __init__(self, A, B, Q, R):
+        """Constructor for LQR problem"""
+        self.A = A
+        self.B = B
+        self.Q = Q
+        self.R = R
+        n, m = B.shape
+        super().__init__(n, m)
+
+    def step(self, x, u):
+        """Dynamics for simulation. Returns next state, noise/observation/measurements, and stage cost"""
+        c = np.random.randn(self.n)
+        x_next = self.A @ x + self.B @ u + c
+        stage_cost = x.T @ self.Q @ x + u.T @ self.R @ u
+        return x_next, c, stage_cost
+
+    def sample_initial_condition(self):
+        return np.random.randn(self.n)
+```
+To create a corresponding policy for the ```LQRProblem```, we can create a ```LQRPolicy```, which inherits from ```COCP```, the class for convex optimization control policies (COCPs):
+```python
+import cvxpy as cp
+from vgi import COCP
+
+class LQRPolicy(COCP):
+    def stage_cost(self, x, u):
+        constraints = []
+        return cp.quad_form(x, self.Q) + cp.quad_form(u, self.R), constraints
+```
+The stage cost function takes in CVXPY variables ```x``` and ```u```, and returns an expression for the stage cost, and any constraints on ```x``` and ```u```. The COCP constructor takes the state and control dimensions ```n``` and ```m``` as arguments, as well as any additional named parameters, such as the positive semidefinite cost matrices ```Q``` and ```R```, as well as the dynamics matrices ```A``` and ```B```.
+
+For example, suppose we have an LQR problem with state dimension 3, input dimension 2, and randomly generated dynamics:
+```python
+# problem dimensions
+import numpy as np
+n = 3
+m = 2
+
+# generate random dynamics matrices
+np.random.seed(0)
+A = np.random.randn(n, n)
+A /= np.max(np.abs(np.linalg.eigvals(A)))
+B = np.random.randn(n, m)
+
+# mean of c
+c = np.zeros(n)
+
+# cost parameters
+Q = np.eye(n)
+R = np.eye(m)
+
+control_problem = LQRProblem(A, B, Q, R)
+``` 
+To create an ADP policy with randomly generated quadratic approximate value function,
+```python
+from vgi import QuadForm
+V_hat = QuadForm.random(n)
+adp_policy = LQRPolicy(n, m, Q=Q, R=R, A=A, B=B, c=c, V=V_hat)
+```
+To compile the policy to a custom solver implementation in C using CVXPYgen, add the argument ```compile=True``` as well as a directory name for the generated code, e.g. ```name="lqr_policy"```.
+
+To simulate the policy for ```T``` steps, run
+```python
+T = 100
+sim = control_problem.simulate(adp_policy, T, seed=0)
+```
+This yields a ```Simulation``` object. Calling ```sim.states_matrix``` gives a ```(T, n)``` matrix of the visited states.
+
+To evaluate the average cost of the policy via simulation, we can run
+```python
+adp_cost = control_problem.cost(adp_policy, seed=0)
+```
+This runs ```eval_trajectories``` simulations starting from different randomly sampled initial conditions, each for ```eval_horizon``` steps, and returns the average cost. The simulations may optionally be run in parallel.
+
+Those parameters may be set explicitly in the constructor for the control problem. For example, if we construct the ```LQRProblem``` as
+```python
+control_problem = LQRProblem(A, B, Q, R, eval_horizon=1000, eval_trajectories=5, processes=5)
+```
+then running
+```python
+adp_cost = control_problem.cost(adp_policy, seed=0)
+```
+will run 5 simulations in parallel, each for 1000 steps, and return the average cost on those trajectories.

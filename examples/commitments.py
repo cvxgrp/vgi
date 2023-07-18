@@ -255,15 +255,13 @@ class CommitmentsProblem(ControlProblem):
 
 class CommitmentsPolicy(COCP):
     def stage_cost(self, x, u):
-        budget = self.params["budget"]
-        target_nav = self.params["target_nav"]
-        cost = cp.sum_squares(x[: self.m] - target_nav)
-        if "u_reg" in self.params and "u_ss" in self.params:
-            u_reg = self.params["u_reg"]
+        cost = cp.sum_squares(x[: self.m] - self.target_nav)
+        if hasattr(self, "u_reg") and hasattr(self, "u_ss"):
+            u_reg = self.u_reg
             if u_reg > 0:
-                u_ss = self.params["u_ss"]
+                u_ss = self.u_ss
                 cost += u_reg * cp.sum_squares(u - u_ss)
-        constraints = [u >= 0, u <= budget]
+        constraints = [u >= 0, u <= self.budget]
         return cost, constraints
 
     def update_value(self, V):
@@ -280,7 +278,7 @@ class CommitmentsPolicy(COCP):
             M11 = A.T @ P @ A
             for i in range(P.shape[0]):
                 for j in range(P.shape[0]):
-                    M11[i, j] += np.trace(P @ self.params["cov"]["A"][i, j])
+                    M11[i, j] += np.trace(P @ self.cov["A"][i, j])
 
             M12 = A.T @ P @ B
             M13 = (A.T @ P @ c + A.T @ p).reshape(-1, 1)
