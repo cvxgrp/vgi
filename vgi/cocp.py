@@ -92,8 +92,8 @@ class COCP(Policy):
         u = cp.Variable((lookahead, m), name="u")
 
         # lookahead
-        self.x_constaint = _x[0, :] == x
-        J, constraints = 0, [self.x_constaint]
+        self.x_constraint = _x[0, :] == x
+        J, constraints = 0, [self.x_constraint]
         for t in range(lookahead):
             _J, _constraints = self._stage_cost(
                 _x[t, :], u[t, :], **self.stage_cost_params[int(t > 0)]
@@ -272,7 +272,7 @@ class COCP(Policy):
     @property
     def value_gradient(self):
         """Get value gradient for fitting value function"""
-        return -self.x_constaint.dual_value
+        return -self.x_constraint.dual_value
 
     def _stage_cost(self, x, u, **kwargs):
         """wrapped version of stage cost which returns tuple (cost, constraint_list)"""
