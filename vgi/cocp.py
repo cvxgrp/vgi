@@ -70,7 +70,7 @@ class COCP(Policy):
         self.solver_settings = solver_settings.copy()
 
         # current state parameter
-        x = cp.Parameter(n, name="x")
+        x = cp.Parameter(n, name="x" + "__" + name)
 
         # stage cost parameters
         self.stage_cost_params = ({}, stage_cost_params)
@@ -80,18 +80,18 @@ class COCP(Policy):
             self.stage_cost_params[0][key].value = val
 
         # affine dynamics parameters
-        _A = cp.Parameter((n, n), name="A")
-        _B = cp.Parameter((n, m), name="B")
-        _c = cp.Parameter(n, name="c")
+        _A = cp.Parameter((n, n), name="A" + "__" + name)
+        _B = cp.Parameter((n, m), name="B" + "__" + name)
+        _c = cp.Parameter(n, name="c" + "__" + name)
 
         # parameters of function EV(Ax+Bu+c)
-        H_sqrt = cp.Parameter((n + m, n + m), name="H_sqrt")
-        h = cp.Parameter(n + m, name="h")
+        H_sqrt = cp.Parameter((n + m, n + m), name="H_sqrt" + "__" + name)
+        h = cp.Parameter(n + m, name="h" + "__" + name)
         self.const = 0
 
         # state variables
-        _x = cp.Variable((lookahead, n), name="_x")
-        u = cp.Variable((lookahead, m), name="u")
+        _x = cp.Variable((lookahead, n), name="_x" + "__" + name)
+        u = cp.Variable((lookahead, m), name="u" + "__" + name)
 
         # lookahead
         self.x_constraint = _x[0, :] == x
@@ -187,8 +187,9 @@ class COCP(Policy):
         """Valid parameters are H, x, and A, B, c if lookahead > 1"""
         for key in param_dict.keys():
             param = param_dict[key]
-            if param is not None and key in self.problem.param_dict.keys():
-                self.problem.param_dict[key].value = param
+            self_key = key + "__" + self.name
+            if param is not None and self_key in self.problem.param_dict.keys():
+                self.problem.param_dict[self_key].value = param
             elif param is not None and key == "const":
                 self.const = param
 
@@ -234,8 +235,9 @@ class COCP(Policy):
 
         # set any parameters that are given
         for key in kwargs.keys():
-            if key in self.problem.param_dict.keys():
-                self.problem.param_dict[key].value = kwargs[key]
+            self_key = key + "__" + self.name
+            if self_key in self.problem.param_dict.keys():
+                self.problem.param_dict[self_key].value = kwargs[key]
 
         try:
             # use cvxpygen compiled method if available
@@ -243,18 +245,23 @@ class COCP(Policy):
                 self.compiled
                 and CPG_METHOD_NAME in self.problem.REGISTERED_SOLVE_METHODS
             ):
-                self.problem.solve(method=CPG_METHOD_NAME, **self.solver_settings)
+                try:
+                    self.problem.solve(method=CPG_METHOD_NAME, **self.solver_settings)
+                except:
+                    # try reloading the correct cvxpy problem instance
+                    self.register_solution_method(self.name)
+                    self.problem.solve(method=CPG_METHOD_NAME, **self.solver_settings)
             else:
                 self.problem.solve(solver=self.solver, **self.solver_settings)
         except cp.SolverError:
             warnings.warn("COCP solver failed.")
             return None
 
-        if self.problem.var_dict["u"].value is None:
+        if self.problem.var_dict["u" + "__" + self.name].value is None:
             warnings.warn("COCP solver failed.")
             return None
 
-        return self.problem.var_dict["u"].value[0, :]
+        return self.problem.var_dict["u" + "__" + self.name].value[0, :]
 
     def steady_state(self):
         """calculate steady state optimal solution"""
@@ -275,6 +282,16 @@ class COCP(Policy):
     def value_gradient(self):
         """Get value gradient for fitting value function"""
         return -self.x_constraint.dual_value
+
+    @property
+    def planned_states(self):
+        """Get COCP lookahead planned states - size (lookahead, n)"""
+        return self.problem.var_dict["_x" + "__" + self.name].value
+
+    @property
+    def planned_controls(self):
+        """Get COCP lookahead planned control actions - size (lookahead, m)"""
+        return self.problem.var_dict["u" + "__" + self.name].value
 
     def _stage_cost(self, x, u, **kwargs):
         """wrapped version of stage cost which returns tuple (cost, constraint_list)"""

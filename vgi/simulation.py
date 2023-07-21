@@ -14,8 +14,20 @@ class Simulation:
         self._bellman_values = []
         self._bellman_value_gradients = []
         self._stage_costs = []
+        self._planned_states = []
+        self._planned_controls = []
 
-    def update(self, x, y, u, stage_cost, bellman_value, bellman_value_gradient):
+    def update(
+        self,
+        x,
+        y,
+        u,
+        stage_cost,
+        bellman_value,
+        bellman_value_gradient,
+        planned_states=None,
+        planned_controls=None,
+    ):
         """Log new state, control, stage_cost"""
         self._x.append(x)
         self._y.append(y)
@@ -23,6 +35,10 @@ class Simulation:
         self._bellman_values.append(bellman_value)
         self._bellman_value_gradients.append(bellman_value_gradient)
         self._stage_costs.append(stage_cost)
+        if planned_states is not None:
+            self._planned_states.append(planned_states)
+        if planned_controls is not None:
+            self._planned_controls.append(planned_controls)
         self.T += 1
 
     @property
@@ -88,3 +104,11 @@ class Simulation:
     def bellman_value_gradients(self):
         """List of computed Bellman values"""
         return self._bellman_value_gradients
+
+    @property
+    def planned_states(self):
+        return np.stack(self._planned_states)
+
+    @property
+    def planned_controls(self):
+        return np.stack(self._planned_controls)

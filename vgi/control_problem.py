@@ -68,6 +68,7 @@ class ControlProblem:
         x0=None,
         seed=None,
         dithering=0.0,
+        log_planned_steps=False,
     ):
         """Simulate a trajectory using a policy and return Simulation object"""
         seed = (
@@ -89,13 +90,30 @@ class ControlProblem:
             bellman_value = policy.value
             bellman_value_gradient = policy.value_gradient
 
+            # log planned states and actions in lookahead policy
+            if log_planned_steps:
+                planned_states = policy.planned_states
+                planned_controls = policy.planned_controls
+            else:
+                planned_states = None
+                planned_controls = None
+
             # dithering
             if np.random.rand() < dithering:
                 u = self.sample_random_control(x, t)
 
             # calculate next state, observations, and stage cost
             x_next, y, stage_cost = self.step(x, u)
-            summary.update(x, y, u, stage_cost, bellman_value, bellman_value_gradient)
+            summary.update(
+                x,
+                y,
+                u,
+                stage_cost,
+                bellman_value,
+                bellman_value_gradient,
+                planned_states,
+                planned_controls,
+            )
             x = x_next
 
             # check for divergence
