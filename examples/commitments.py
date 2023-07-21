@@ -470,7 +470,7 @@ def commitment_cocp_grad(
                     % (k + 1, test_loss, expected_cost)
                 )
             else:
-                print("it: %03d" % (k+1))
+                print("it: %03d" % (k + 1))
 
         # gradient step
         opt.zero_grad()

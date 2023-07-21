@@ -159,7 +159,11 @@ class BoxLQRPolicy(COCP):
             constraints = [u >= -self.u_max, u <= self.u_max]
         else:
             constraints = []
-        return cp.sum_squares(psd_sqrt(self.Q) @ x) + cp.sum_squares(psd_sqrt(self.R) @ u), constraints,
+        return (
+            cp.sum_squares(psd_sqrt(self.Q) @ x) + cp.sum_squares(psd_sqrt(self.R) @ u),
+            constraints,
+        )
+
 
 def box_lqr_cvxpylayer(problem):
     n, m = problem.n, problem.m
@@ -252,7 +256,12 @@ def box_lqr_cocp_grad(
     P_sqrt.requires_grad_(True)
 
     # run optimization
-    opt = torch.optim.Adam([P_sqrt,], lr=learning_rate)
+    opt = torch.optim.Adam(
+        [
+            P_sqrt,
+        ],
+        lr=learning_rate,
+    )
     costs = []
     value_iterates = []
     x0 = None
@@ -280,7 +289,7 @@ def box_lqr_cocp_grad(
                     % (k + 1, test_loss, expected_cost)
                 )
             else:
-                print("it: %03d" % (k+1))
+                print("it: %03d" % (k + 1))
 
         # gradient step
         opt.zero_grad()

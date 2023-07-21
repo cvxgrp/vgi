@@ -324,7 +324,7 @@ class SupplyChainPolicy(COCP):
         # unpack state
         h = x[: self.n]
         # unpack input
-        b = u[:self.num_buyers]
+        b = u[: self.num_buyers]
         s = u[self.num_buyers : self.num_buyers + self.num_sellers]
         z = u[self.num_buyers + self.num_sellers :]
 
@@ -554,13 +554,14 @@ def supply_chain_cocp_grad(
                     % (k + 1, test_loss, expected_cost)
                 )
             else:
-                print("it: %03d" % (k+1))
+                print("it: %03d" % (k + 1))
 
         opt.zero_grad()
         l, x0 = lossf(
             samples_per_iter,
             num_trajectories,
-            P_sqrt, p,
+            P_sqrt,
+            p,
             x_batch=None if restart_simulations else x0,
             seed=k + 1,
         )
