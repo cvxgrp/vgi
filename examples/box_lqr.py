@@ -94,7 +94,7 @@ class BoxLQRProblem(ControlProblem):
             constraints = [R - self.R << cp.diag(lam), P >> 0, R >> 0, lam >= 0]
         else:
             objective = cp.trace(P @ W)
-            constraints = [P >> 0, R >> 0]
+            constraints = [P >> 0, R == self.R]
 
         constraints += [
             cp.bmat(
