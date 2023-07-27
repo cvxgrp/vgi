@@ -252,7 +252,12 @@ class COCP(Policy):
                     self.register_solution_method(self.name)
                     self.problem.solve(method=CPG_METHOD_NAME, **self.solver_settings)
             else:
-                self.problem.solve(solver=self.solver, **self.solver_settings)
+                try:
+                    self.problem.solve(method=CPG_METHOD_NAME, **self.solver_settings)
+                except:
+                    # try reloading the correct cvxpy problem instance
+                    self.register_solution_method(self.name)
+                    self.problem.solve(method=CPG_METHOD_NAME, **self.solver_settings)
         except cp.SolverError:
             warnings.warn("COCP solver failed.")
             return None
