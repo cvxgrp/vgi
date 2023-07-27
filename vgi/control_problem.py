@@ -111,8 +111,8 @@ class ControlProblem:
                 stage_cost,
                 bellman_value,
                 bellman_value_gradient,
-                planned_states,
-                planned_controls,
+                planned_states=planned_states,
+                planned_controls=planned_controls,
             )
             x = x_next
 
