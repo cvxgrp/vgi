@@ -222,6 +222,8 @@ class SupplyChainProblem(ControlProblem):
             h_max=self.h_max,
             num_buyers=self.num_buyers,
             num_sellers=self.num_sellers,
+            mean_buy_price=self.mean_buy_price,
+            mean_demand=self.mean_demand,
             name=name,
             compile=compile,
             stage_cost_params=stage_cost_params,
@@ -343,6 +345,17 @@ class SupplyChainPolicy(COCP):
         ]
 
         return stage_cost, constraints
+
+    @property
+    def planned_states(self):
+        """Get COCP lookahead planned states - size (lookahead, n)"""
+        X = np.zeros((self.lookahead, self.n + self.num_buyers + self.num_sellers))
+        X[:, : self.n] = self.problem.var_dict["_x"].value
+        p0 = self.problem.param_dict["p"].value
+        d0 = self.problem.param_dict["d"].value
+        X[0, self.n :] = np.hstack((p0, d0))
+        X[1:, self.n :] = np.hstack((self.mean_buy_price, self.mean_demand))
+        return X
 
 
 def supply_chain_cvxpylayer(problem):
